@@ -22,7 +22,6 @@ public class StatsService {
         // используй repository.save()
         EndpointHit entity = EndpointHitMapper.toEntity(dto);
         repository.save(entity);
-
     }
 
     public List<ViewStatsDto> getStats(
