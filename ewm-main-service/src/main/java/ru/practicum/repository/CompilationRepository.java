@@ -8,4 +8,8 @@ import java.util.List;
 
 public interface CompilationRepository extends JpaRepository<Compilation, Long> {
     List<Compilation> findByPinned(Boolean pinned, Pageable pageable);
+
+    boolean existsByTitle(String title);
+
+    boolean existsByTitleAndIdNot(String title, Long id);
 }
