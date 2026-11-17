@@ -1,55 +1,54 @@
 package ru.practicum.service;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.crossstore.ChangeSetPersister;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
-import ru.practicum.dto.NewUserRequest;
-import ru.practicum.dto.UserDto;
+import org.springframework.transaction.annotation.Transactional;
+import ru.practicum.dto.user.NewUserRequest;
+import ru.practicum.dto.user.UserDto;
+import ru.practicum.exception.ConflictException;
 import ru.practicum.exception.NotFoundException;
 import ru.practicum.mapper.UserMapper;
 import ru.practicum.model.User;
 import ru.practicum.repository.UserRepository;
+import ru.practicum.util.OffsetPageRequest;
 
 import java.util.List;
 
 @Service
-@RequiredArgsConstructor public class UserService {
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
+public class UserService {
     private final UserRepository userRepository;
     private final UserMapper userMapper;
 
-
     public List<UserDto> getUsers(List<Long> ids, int from, int size) {
-        int page = from / size;
-        Pageable pageable = PageRequest.of(page, size);
-        List<User> users;
-        if (ids == null || ids.isEmpty()) {
-            users = userRepository.findAll(pageable).getContent();
-        }
-        else {
-            users = userRepository.findAllByIdIn(ids, pageable);
-        }
+        Pageable pageable = OffsetPageRequest.of(from, size);
+        List<User> users = (ids == null || ids.isEmpty())
+                ? userRepository.findAll(pageable).getContent()
+                : userRepository.findAllByIdIn(ids, pageable);
         return userMapper.toDtoList(users);
     }
 
+    @Transactional
     public UserDto createUser(NewUserRequest request) {
-        // конвертировать DTO → Entity
-        // сохранить
-        // вернуть UserDto
-        User user = userMapper.toEntity(request);
-        User saveUser = userRepository.save(user);
-        return userMapper.toDto(saveUser);
+        if (userRepository.existsByEmail(request.getEmail())) {
+            throw new ConflictException("User with email=" + request.getEmail() + " already exists");
+        }
+        User saved = userRepository.save(userMapper.toEntity(request));
+        return userMapper.toDto(saved);
     }
 
-    // DELETE /admin/users/{userId}
+    @Transactional
     public void deleteUser(Long userId) {
-        // проверить что пользователь существует
-        // удалить
         if (!userRepository.existsById(userId)) {
-            throw new NotFoundException("Пользователь с id=" + userId + " не найден");
+            throw new NotFoundException("User with id=" + userId + " was not found");
         }
-
         userRepository.deleteById(userId);
+    }
+
+    public User getUserOrThrow(Long userId) {
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException("User with id=" + userId + " was not found"));
     }
 }
